@@ -3,14 +3,11 @@
 # We don't need return codes for "$(command)", only stdout is needed.
 # Allow `[[ -n "$(command)" ]]`, `func "$(command)"`, pipes, etc.
 # shellcheck disable=SC2312
-
 set -u
-
 abort() {
   printf "%s\n" "$@"
   exit 1
 }
-
 # Fail fast with a concise message when not using bash
 # Single brackets are needed here for POSIX compatibility
 # shellcheck disable=SC2292
@@ -18,9 +15,7 @@ if [ -z "${BASH_VERSION:-}" ]
 then
   abort "Bash is required to interpret this script."
 fi
-
 shopt -s extglob
-
 strip_s() {
   local s
   for s in "$@"
@@ -29,7 +24,6 @@ strip_s() {
     echo "${s%% }"
   done
 }
-
 dir_children() {
   local p
   for p in "$@"
@@ -38,7 +32,6 @@ dir_children() {
     find "${p}" -mindepth 1 -maxdepth 1
   done
 }
-
 # Set up temp dir
 tmpdir="/tmp/uninstall.$$"
 mkdir -p "${tmpdir}" || abort "Unable to create temp dir '${tmpdir}'"
@@ -47,16 +40,13 @@ trap '
   # Invalidate sudo timestamp before exiting
   /usr/bin/sudo -k
 ' EXIT
-
 # Default options
 opt_force=""
 opt_quiet=""
 opt_dry_run=""
 opt_skip_cache_and_logs=""
-
 # global status to indicate whether there is anything wrong.
 failed=false
-
 un="$(uname)"
 case "${un}" in
   Linux)
@@ -79,7 +69,6 @@ case "${un}" in
     abort "Unsupported system type '${un}'"
     ;;
 esac
-
 # string formatters
 if [[ -t 1 ]]
 then
@@ -92,35 +81,28 @@ tty_blue="$(tty_mkbold 34)"
 tty_red="$(tty_mkbold 31)"
 tty_bold="$(tty_mkbold 39)"
 tty_reset="$(tty_escape 0)"
-
 unset HAVE_SUDO_ACCESS # unset this from the environment
-
 have_sudo_access() {
   if [[ ! -x "/usr/bin/sudo" ]]
   then
     return 1
   fi
-
   local -a SUDO=("/usr/bin/sudo")
   if [[ -n "${SUDO_ASKPASS-}" ]]
   then
     SUDO+=("-A")
   fi
-
   if [[ -z "${HAVE_SUDO_ACCESS-}" ]]
   then
     "${SUDO[@]}" -l mkdir &>/dev/null
     HAVE_SUDO_ACCESS="$?"
   fi
-
   if [[ -z "${HOMEBREW_ON_LINUX-}" ]] && [[ "${HAVE_SUDO_ACCESS}" -ne 0 ]]
   then
     abort "Need sudo access on macOS (e.g. the user ${USER} needs to be an administrator)!"
   fi
-
   return "${HAVE_SUDO_ACCESS}"
 }
-
 shell_join() {
   local arg
   printf "%s" "$1"
@@ -131,9 +113,7 @@ shell_join() {
     printf "%s" "${arg// /\ }"
   done
 }
-
 resolved_pathname() { realpath "$1"; }
-
 pretty_print_pathnames() {
   local p
   for p in "$@"
@@ -149,26 +129,21 @@ pretty_print_pathnames() {
     fi
   done
 }
-
 chomp() {
   printf "%s" "${1/"$'\n'"/}"
 }
-
 ohai() {
   printf "${tty_blue}==>${tty_bold} %s${tty_reset}\n" "$(shell_join "$@")"
 }
-
 warn() {
   printf "${tty_red}Warning${tty_reset}: %s\n" "$(chomp "$1")"
 }
-
 execute() {
   if ! "$@"
   then
     abort "$(printf "Failed during: %s" "$(shell_join "$@")")"
   fi
 }
-
 execute_sudo() {
   local -a args=("$@")
   if have_sudo_access
@@ -184,7 +159,6 @@ execute_sudo() {
     system "${args[@]}"
   fi
 }
-
 system() {
   if ! "$@"
   then
@@ -192,11 +166,8 @@ system() {
     failed=true
   fi
 }
-
 ####################################################################### script
-
 homebrew_prefix_candidates=()
-
 usage() {
   cat <<EOS
 Homebrew Uninstaller
@@ -211,7 +182,6 @@ Usage: $0 [options]
 EOS
   exit "${1:-0}"
 }
-
 while [[ $# -gt 0 ]]
 do
   case "$1" in
@@ -229,7 +199,6 @@ do
   esac
   shift
 done
-
 # Attempt to locate Homebrew unless `--path` is passed
 if [[ "${#homebrew_prefix_candidates[@]}" -eq 0 ]]
 then
@@ -239,8 +208,7 @@ then
   [[ -n "${prefix}" ]] && homebrew_prefix_candidates+=("$(dirname "$(dirname "$(strip_s "${prefix}")")")")
   homebrew_prefix_candidates+=("${homebrew_prefix_default}") # Homebrew default path
   homebrew_prefix_candidates+=("${HOME}/.linuxbrew")         # Linuxbrew default path
-fi
-
+fi=
 HOMEBREW_PREFIX="$(
   for p in "${homebrew_prefix_candidates[@]}"
   do
@@ -260,14 +228,12 @@ then
 else
   abort "Failed to locate Homebrew!"
 fi
-
 if [[ -d "${HOMEBREW_PREFIX}/Cellar" ]]
 then
   HOMEBREW_CELLAR="${HOMEBREW_PREFIX}/Cellar"
 else
   HOMEBREW_CELLAR="${HOMEBREW_REPOSITORY}/Cellar"
 fi
-
 if [[ -s "${HOMEBREW_REPOSITORY}/.gitignore" ]]
 then
   gitignore="$(<"${HOMEBREW_REPOSITORY}/.gitignore")"
@@ -275,7 +241,6 @@ else
   gitignore="$(curl -fsSL https://raw.githubusercontent.com/Homebrew/brew/HEAD/.gitignore)"
 fi
 [[ -n "${gitignore}" ]] || abort "Failed to fetch Homebrew .gitignore!"
-
 {
   while read -r l
   do
@@ -285,7 +250,6 @@ fi
     [[ "${l}" == @(bin|share|share/doc) ]] && echo "REJECT: ${l}" >&2 && continue
     echo "${HOMEBREW_REPOSITORY}/${l}"
   done <<<"${gitignore}"
-
   if [[ "${HOMEBREW_PREFIX}" != "${HOMEBREW_REPOSITORY}" ]]
   then
     echo "${HOMEBREW_REPOSITORY}"
@@ -310,7 +274,6 @@ fi
   fi
   echo "${HOMEBREW_CELLAR}"
   echo "${HOMEBREW_PREFIX}/Caskroom"
-
   [[ -n ${opt_skip_cache_and_logs} ]] || cat <<-EOS
 ${HOME}/Library/Caches/Homebrew
 ${HOME}/Library/Logs/Homebrew
@@ -318,8 +281,7 @@ ${HOME}/Library/Logs/Homebrew
 ${HOME}/.cache/Homebrew
 ${HOMEBREW_CACHE:-}
 ${HOMEBREW_LOGS:-}
-EOS
-
+EOS=
   if [[ "${ostype}" == macos ]]
   then
     dir_children "/Applications" "${HOME}/Applications" | while read -r p2; do
@@ -334,20 +296,17 @@ while read -r l
 do
   homebrew_files+=("${l}")
 done <"${tmpdir}/homebrew_files"
-
 if [[ -z "${opt_quiet}" ]]
 then
   dry_str="${opt_dry_run:+would}"
   warn "This script ${dry_str:-will} remove:"
   pretty_print_pathnames "${homebrew_files[@]}"
 fi
-
 if [[ -t 0 && -z "${opt_force}" && -z "${opt_dry_run}" ]]
 then
   read -rp "Are you sure you want to uninstall Homebrew? This will remove your installed packages! [y/N] "
   [[ "${REPLY}" == [yY]* ]] || abort
 fi
-
 [[ -n "${opt_quiet}" ]] || ohai "Removing Homebrew installation..."
 paths=()
 for p in Frameworks bin etc include lib opt sbin share var
@@ -383,7 +342,6 @@ then
   [[ -n "${opt_dry_run}" ]] && echo "Would delete:"
   system /usr/bin/find "${args[@]}"
 fi
-
 for file in "${homebrew_files[@]}"
 do
   if [[ -n "${opt_dry_run}" ]]
@@ -397,7 +355,6 @@ do
     fi
   fi
 done
-
 [[ -n "${opt_quiet}" ]] || ohai "Removing empty directories..."
 paths=()
 for p in bin etc include lib opt sbin share var Caskroom Cellar Homebrew Frameworks
@@ -429,7 +386,6 @@ then
   fi
   execute_sudo /usr/bin/find "${args[@]}"
 fi
-
 [[ -n "${opt_dry_run}" ]] && exit
 if [[ "${HOMEBREW_PREFIX}" != "${homebrew_prefix_default}" && -e "${HOMEBREW_PREFIX}" ]]
 then
@@ -439,7 +395,6 @@ if [[ "${HOMEBREW_PREFIX}" != "${HOMEBREW_REPOSITORY}" && -e "${HOMEBREW_REPOSIT
 then
   execute_sudo rmdir "${HOMEBREW_REPOSITORY}"
 fi
-
 if [[ -z "${opt_quiet}" ]]
 then
   if [[ "${failed}" == true ]]
@@ -450,10 +405,8 @@ then
     ohai "Homebrew uninstalled!"
   fi
 fi
-
 dir_children "${HOMEBREW_REPOSITORY}" "${HOMEBREW_PREFIX}" |
   sort -u >"${tmpdir}/residual_files"
-
 if [[ -s "${tmpdir}/residual_files" && -z "${opt_quiet}" ]]
 then
   echo "The following possible Homebrew files were not deleted:"
@@ -463,5 +416,4 @@ then
   done <"${tmpdir}/residual_files"
   echo -e "You may wish to remove them yourself.\n"
 fi
-
 [[ "${failed}" != true ]]
